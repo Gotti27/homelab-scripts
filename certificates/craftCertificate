@@ -1,0 +1,48 @@
+#!/bin/python3
+
+import os
+import sys
+
+base_directory = "/etc/ssl/yourdomain"
+ca_pem_path = "your_ca.pem"
+ca_key_path = 'your_ca.key'
+
+if os.geteuid() != 0:
+        print("This script must be run as root")
+        sys.exit(1)
+
+directory = input("directory name: ")
+full_path = os.path.join(base_directory, directory)
+
+os.makedirs(full_path, exist_ok = True)
+
+print(f"directory {full_path} created")
+
+os.chdir(full_path)
+
+key_name = input("key name: ")
+
+os.system(f"openssl genrsa -out {key_name}.key 2048")
+
+os.system(f"openssl req -new -key {key_name}.key -out {key_name}.csr")
+
+ext_text = f"""
+
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = {key_name}
+
+"""
+
+with open(f"{key_name}.ext", "w") as f:
+        f.write(ext_text)
+
+os.system(f"openssl x509 -req -in {key_name}.csr -CA {ca_pem_path} -CAkey {ca_key_path} -CAcreateserial -out {key_name}.crt -days 825 -sha256 -extfile {key_name}.ext")
+
+print("--- done ---")
+sys.exit(0)
+
